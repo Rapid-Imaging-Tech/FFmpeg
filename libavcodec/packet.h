@@ -368,6 +368,13 @@ typedef struct AVPacket {
     int64_t dts;
     uint8_t *data;
     int   size;
+
+    /**
+     * RTP header extension data. Only used for RTP streams.
+     */
+    uint8_t *ext;
+    int extlen;
+
     int   stream_index;
     /**
      * A combination of AV_PKT_FLAG values
@@ -766,6 +773,18 @@ int av_packet_make_writable(AVPacket *pkt);
  *               converted
  */
 void av_packet_rescale_ts(AVPacket *pkt, AVRational tb_src, AVRational tb_dst);
+
+
+/**
+ * Helper function to set up RTP header extension for an AVPacket.
+ *
+ * @param pkt packet to add RTP header extension to
+ * @param buf buffer to copy extension data from
+ * @param len length of buf
+ *
+ * @return 0 on success
+ */
+int av_set_packet_ext(AVPacket *pkt, uint8_t *buf, int len);
 
 /**
  * @}

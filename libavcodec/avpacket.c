@@ -179,6 +179,34 @@ int av_packet_from_data(AVPacket *pkt, uint8_t *data, int size)
     return 0;
 }
 
+static void av_packet_free_ext(AVPacket *pkt) {
+    if (pkt->extlen > 0) {
+        if (pkt->ext) {
+            av_free(pkt->ext);
+            pkt->ext = NULL;
+        }
+        pkt->extlen = 0;
+    }
+}
+
+int av_set_packet_ext(AVPacket *pkt, uint8_t *buf, int len) {
+    av_packet_free_ext(pkt);
+    if (len > 0) {
+        pkt->ext = av_malloc(len);
+        pkt->extlen = len;
+        memcpy(pkt->ext, buf, len);
+    }
+    return 0;
+}
+
+static int av_copy_packet_ext(AVPacket *pkt, const AVPacket *src) {
+    av_packet_free_ext(pkt);
+    if (src->extlen > 0) {
+        av_set_packet_ext(pkt, src->ext, src->extlen);
+    }
+    return 0;
+}
+
 #if FF_API_AVPACKET_OLD_API
 FF_DISABLE_DEPRECATION_WARNINGS
 #define ALLOC_MALLOC(data, size) data = av_malloc(size)
@@ -223,6 +251,16 @@ static int copy_packet_data(AVPacket *pkt, const AVPacket *src, int dup)
     } else {
         DUP_DATA(pkt->data, src->data, pkt->size, 1, ALLOC_BUF);
     }
+
+    if (src->extlen > 0) {
+        if (dup) {
+            pkt->extlen = src->extlen;
+            pkt->ext = src->ext;
+        } else {
+            av_copy_packet_ext(pkt, src);
+        }
+    }
+
     if (src->side_data_elems && dup) {
         pkt->side_data = src->side_data;
         pkt->side_data_elems = src->side_data_elems;
@@ -301,6 +339,7 @@ void av_free_packet(AVPacket *pkt)
         pkt->size            = 0;
 
         av_packet_free_side_data(pkt);
+        av_packet_free_ext(pkt);
     }
 }
 FF_ENABLE_DEPRECATION_WARNINGS
@@ -634,6 +673,7 @@ FF_ENABLE_DEPRECATION_WARNINGS
 void av_packet_unref(AVPacket *pkt)
 {
     av_packet_free_side_data(pkt);
+    av_packet_free_ext(pkt);
     av_buffer_unref(&pkt->buf);
     get_packet_defaults(pkt);
 }
@@ -647,6 +687,8 @@ int av_packet_ref(AVPacket *dst, const AVPacket *src)
     ret = av_packet_copy_props(dst, src);
     if (ret < 0)
         goto fail;
+
+    av_copy_packet_ext(dst, src);
 
     if (!src->buf) {
         ret = packet_alloc(&dst->buf, src->size);

@@ -1478,6 +1478,13 @@ static int parse_packet(AVFormatContext *s, AVPacket *pkt,
             pkt->side_data_elems    = 0;
         }
 
+        if(pkt->extlen > 0) {
+            out_pkt->ext = pkt->ext;
+            out_pkt->extlen = pkt->extlen;
+            pkt->ext = NULL;
+            pkt->extlen = 0;
+        }
+
         /* set the duration */
         out_pkt->duration = (st->parser->flags & PARSER_FLAG_COMPLETE_FRAMES) ? pkt->duration : 0;
         if (st->codecpar->codec_type == AVMEDIA_TYPE_AUDIO) {
